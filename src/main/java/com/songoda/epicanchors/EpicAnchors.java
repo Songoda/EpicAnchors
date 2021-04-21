@@ -22,7 +22,6 @@ import com.songoda.epicanchors.settings.Settings;
 import com.songoda.epicanchors.tasks.AnchorTask;
 import com.songoda.epicanchors.tasks.VisualizeTask;
 import com.songoda.epicanchors.utils.Methods;
-import org.apache.commons.lang.math.NumberUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.inventory.ItemStack;
@@ -158,15 +157,18 @@ public class EpicAnchors extends SongodaPlugin {
         if (!dataFile.contains("Anchors")) return;
         for (String locationStr : dataFile.getConfigurationSection("Anchors").getKeys(false)) {
             Location location = Methods.unserializeLocation(locationStr);
+
+            String worldName = location.getWorld() == null ? locationStr.substring(0, locationStr.indexOf(':')) : null;
             int ticksLeft = dataFile.getInt("Anchors." + locationStr + ".ticksLeft");
-            anchorManager.addAnchor(location, new Anchor(location, ticksLeft));
+
+            anchorManager.addAnchor(location, new Anchor(location, worldName, ticksLeft));
         }
     }
 
     private void saveToFile() {
         dataFile.clearConfig(true);
         for (Anchor anchor : anchorManager.getAnchors().values()) {
-            String locationStr = Methods.serializeLocation(anchor.getLocation());
+            String locationStr = Methods.serializeLocation(anchor.getLocation(), anchor.getWorldName());
             dataFile.set("Anchors." + locationStr + ".ticksLeft", anchor.getTicksLeft());
         }
         dataFile.save();

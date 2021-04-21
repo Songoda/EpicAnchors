@@ -7,12 +7,10 @@ import com.songoda.epicanchors.settings.Settings;
 import org.bukkit.*;
 import org.bukkit.block.Block;
 
-import java.text.DecimalFormat;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
 public class Methods {
 
@@ -25,7 +23,6 @@ public class Methods {
         String name = Settings.NAMETAG.getString().replace("{REMAINING}", (ticks <= 0)
                 ? EpicAnchors.getInstance().getLocale().getMessage("infinite").getMessage() : remaining);
 
-
         return TextUtils.formatText(name);
     }
 
@@ -35,15 +32,19 @@ public class Methods {
      * @param location The location that is to be saved.
      * @return The serialized data.
      */
-    public static String serializeLocation(Location location) {
+    public static String serializeLocation(Location location, String worldName) {
         if (location == null)
             return "";
-        String w = location.getWorld().getName();
+
+        String w = location.getWorld() != null ? location.getWorld().getName() : worldName;
         double x = location.getX();
         double y = location.getY();
         double z = location.getZ();
+
         String str = w + ":" + x + ":" + y + ":" + z;
-        str = str.replace(".0", "").replace("/", "");
+        str = str.replace(".0", "")
+                .replace("/", "");
+
         return str;
     }
 

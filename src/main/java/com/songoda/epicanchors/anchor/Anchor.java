@@ -4,23 +4,34 @@ import com.songoda.core.compatibility.ServerVersion;
 import com.songoda.core.hooks.EconomyManager;
 import com.songoda.epicanchors.EpicAnchors;
 import com.songoda.epicanchors.settings.Settings;
-import org.bukkit.*;
+import org.bukkit.Bukkit;
+import org.bukkit.GameMode;
+import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.Particle;
+import org.bukkit.Sound;
+import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
 public class Anchor {
 
     private Location location;
-    private int ticksLeft;
-    private boolean isInfinite;
+    private String worldName;   // May be null if location.getWorld() is null too
 
     private final int chunkX;
     private final int chunkZ;
 
-    public Anchor(Location location, int ticksLeft) {
+    private int ticksLeft;
+    private boolean isInfinite;
+
+    public Anchor(Location location, String worldName, int ticksLeft) {
         this.location = location;
+        this.worldName = worldName;
+
         this.chunkX = location.getBlockX() >> 4;
         this.chunkZ = location.getBlockZ() >> 4;
+
         this.ticksLeft = ticksLeft;
         this.isInfinite = (ticksLeft == -99);
     }
@@ -62,21 +73,28 @@ public class Anchor {
 
         if (Settings.ALLOW_ANCHOR_BREAKING.getBoolean() && getTicksLeft() > 0) {
             ItemStack item = plugin.makeAnchorItem(getTicksLeft());
-            getLocation().getWorld().dropItemNaturally(getLocation(), item);
+            getWorld().dropItemNaturally(getLocation(), item);
         }
+
+        Location loc = getLocation();
+
         plugin.clearHologram(this);
-        location.getBlock().setType(Material.AIR);
+        loc.getBlock().setType(Material.AIR);
 
         if (ServerVersion.isServerVersionAtLeast(ServerVersion.V1_9))
-            location.getWorld().spawnParticle(Particle.LAVA, location.clone().add(.5, .5, .5), 5, 0, 0, 0, 5);
+            getWorld().spawnParticle(Particle.LAVA, loc.clone().add(.5, .5, .5), 5, 0, 0, 0, 5);
 
-        location.getWorld().playSound(location, ServerVersion.isServerVersionAtLeast(ServerVersion.V1_9)
+        getWorld().playSound(loc, ServerVersion.isServerVersionAtLeast(ServerVersion.V1_9)
                 ? Sound.ENTITY_GENERIC_EXPLODE : Sound.valueOf("EXPLODE"), 10, 10);
 
-        plugin.getAnchorManager().removeAnchor(location);
+        plugin.getAnchorManager().removeAnchor(loc);
     }
 
     public Location getLocation() {
+        if (location.getWorld() == null) {
+            location.setWorld(Bukkit.getWorld(worldName));
+        }
+
         return location.clone();
     }
 
@@ -89,7 +107,15 @@ public class Anchor {
     }
 
     public World getWorld() {
-        return location.getWorld();
+        return getLocation().getWorld();
+    }
+
+    public String getWorldName() {
+        if (location.getWorld() == null) {
+            return this.worldName;
+        }
+
+        return location.getWorld().getName();
     }
 
     public int getTicksLeft() {

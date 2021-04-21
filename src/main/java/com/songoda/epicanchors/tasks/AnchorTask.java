@@ -58,7 +58,6 @@ public class AnchorTask extends BukkitRunnable {
 
             fieldCurrentTick = clazzMinecraftServer.getDeclaredField("currentTick");
             fieldActivatedTick = clazzEntity.getDeclaredField("activatedTick");
-
         } catch (ReflectiveOperationException e) {
             e.printStackTrace();
         }
@@ -78,12 +77,12 @@ public class AnchorTask extends BukkitRunnable {
     public void run() {
         doParticle();
         for (Anchor anchor : new ArrayList<>(plugin.getAnchorManager().getAnchors().values())) {
+            Location location = anchor.getLocation();
 
-            if (anchor.getLocation() == null) continue;
+            if (location.getWorld() == null) continue;
 
             plugin.updateHologram(anchor);
 
-            Location location = anchor.getLocation();
             if (CompatibleMaterial.getMaterial(location.getBlock()) != Settings.MATERIAL.getMaterial())
                 continue;
 
