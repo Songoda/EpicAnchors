@@ -16,8 +16,8 @@ import org.bukkit.inventory.ItemStack;
 
 public class Anchor {
 
-    private Location location;
-    private String worldName;   // May be null if location.getWorld() is null too
+    private final Location location;
+    private final String worldName;   // May be null if location.getWorld() is null too
 
     private final int chunkX;
     private final int chunkZ;

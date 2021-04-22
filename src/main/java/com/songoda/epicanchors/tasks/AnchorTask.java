@@ -1,12 +1,13 @@
 package com.songoda.epicanchors.tasks;
 
-import com.songoda.core.compatibility.CompatibleMaterial;
 import com.songoda.core.compatibility.CompatibleParticleHandler;
 import com.songoda.core.compatibility.ServerVersion;
 import com.songoda.epicanchors.EpicAnchors;
 import com.songoda.epicanchors.anchor.Anchor;
 import com.songoda.epicanchors.settings.Settings;
-import org.bukkit.*;
+import org.bukkit.Bukkit;
+import org.bukkit.Chunk;
+import org.bukkit.Location;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
@@ -17,21 +18,24 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class AnchorTask extends BukkitRunnable {
 
     private static EpicAnchors plugin;
 
-    private Map<Location, Integer> delays = new HashMap<>();
+    private final Map<Location, Integer> delays = new HashMap<>();
 
-    private Class<?> clazzEntity, clazzCraftEntity, clazzMinecraftServer;
+    private Class<?> clazzCraftEntity;
 
     private Method methodTick, methodGetHandle;
 
     private Field fieldCurrentTick, fieldActivatedTick;
 
-    private boolean epicSpawners;
+    private final boolean epicSpawners;
 
     public AnchorTask(EpicAnchors plug) {
         plugin = plug;
@@ -39,8 +43,9 @@ public class AnchorTask extends BukkitRunnable {
 
         try {
             String ver = Bukkit.getServer().getClass().getPackage().getName().substring(23);
-            clazzMinecraftServer = Class.forName("net.minecraft.server." + ver + ".MinecraftServer");
-            clazzEntity = Class.forName("net.minecraft.server." + ver + ".Entity");
+
+            Class<?> clazzMinecraftServer = Class.forName("net.minecraft.server." + ver + ".MinecraftServer");
+            Class<?> clazzEntity = Class.forName("net.minecraft.server." + ver + ".Entity");
             clazzCraftEntity = Class.forName("org.bukkit.craftbukkit." + ver + ".entity.CraftEntity");
 
             if (ServerVersion.isServerVersionAtLeast(ServerVersion.V1_13))
@@ -65,46 +70,57 @@ public class AnchorTask extends BukkitRunnable {
         this.runTaskTimer(plugin, 0, 3);
     }
 
-    private void doParticle() {
-        for (Anchor anchor : plugin.getAnchorManager().getAnchors().values()) {
-            Location location1 = anchor.getLocation().add(.5, .5, .5);
-            if (location1.getWorld() == null) continue;
-            CompatibleParticleHandler.redstoneParticles(location1, 255, 255, 255, 1.2F, 5, .75F);
-        }
+    private void doParticle(Location anchorLocation) {
+        CompatibleParticleHandler.redstoneParticles(anchorLocation.clone().add(.5, .5, .5),
+                255, 255, 255, 1.2F, 5, .75F);
     }
 
     @Override
     public void run() {
-        doParticle();
+        Set<Chunk> chunks = new HashSet<>();
+        List<Anchor> toUpdate = new ArrayList<>();
+
         for (Anchor anchor : new ArrayList<>(plugin.getAnchorManager().getAnchors().values())) {
             Location location = anchor.getLocation();
 
             if (location.getWorld() == null) continue;
 
-            plugin.updateHologram(anchor);
+            doParticle(location);
+            toUpdate.add(anchor);
 
-            if (CompatibleMaterial.getMaterial(location.getBlock()) != Settings.MATERIAL.getMaterial())
+            if (location.getBlock().getType() != Settings.MATERIAL.getMaterial().getMaterial())
                 continue;
 
             Chunk chunk = location.getChunk();
-            chunk.load();
 
-            // Load entities
-            for (Entity entity : chunk.getEntities()) {
-                if (!(entity instanceof LivingEntity) || entity instanceof Player) continue;
+            boolean processChunk = chunks.add(chunk);
 
-                if (entity.getNearbyEntities(32, 32, 32).stream().anyMatch(entity1 -> entity1 instanceof Player)) {
-                    continue;
+            if (processChunk) {
+                if (!chunk.isLoaded()) {
+                    chunk.load();
                 }
 
-                try {
-                    Object objCraftEntity = clazzCraftEntity.cast(entity);
-                    Object objEntity = methodGetHandle.invoke(objCraftEntity);
+                // Load entities
+                entityLoop:
+                for (Entity entity : chunk.getEntities()) {
+                    if (!(entity instanceof LivingEntity) || entity instanceof Player) continue;
 
-                    fieldActivatedTick.set(objEntity, fieldCurrentTick.getLong(objEntity));
-                    methodTick.invoke(objEntity);
-                } catch (ReflectiveOperationException e) {
-                    e.printStackTrace();
+                    for (Player inWorld : entity.getWorld().getPlayers()) {
+                        // Not sure where the 32 is from
+                        if (inWorld.getLocation().distanceSquared(entity.getLocation()) <= 32) {
+                            continue entityLoop;
+                        }
+                    }
+
+                    try {
+                        Object objCraftEntity = clazzCraftEntity.cast(entity);
+                        Object objEntity = methodGetHandle.invoke(objCraftEntity);
+
+                        fieldActivatedTick.set(objEntity, fieldCurrentTick.getLong(objEntity));
+                        methodTick.invoke(objEntity);
+                    } catch (ReflectiveOperationException e) {
+                        e.printStackTrace();
+                    }
                 }
             }
 
@@ -117,10 +133,11 @@ public class AnchorTask extends BukkitRunnable {
             if (ticksLeft <= 0 && !anchor.isInfinite()) {
                 anchor.bust();
                 chunk.unload();
-                return;
+                continue;
             }
 
-            if (!epicSpawners || com.songoda.epicspawners.EpicSpawners.getInstance().getSpawnerManager() == null) continue;
+            if (!processChunk || !epicSpawners ||
+                    com.songoda.epicspawners.EpicSpawners.getInstance().getSpawnerManager() == null) continue;
 
             com.songoda.epicspawners.EpicSpawners.getInstance().getSpawnerManager().getSpawners().stream()
                     .filter(spawner -> spawner.getWorld().isChunkLoaded(spawner.getX() >> 4, spawner.getZ() >> 4)
@@ -140,5 +157,7 @@ public class AnchorTask extends BukkitRunnable {
                 }
             });
         }
+
+        plugin.updateHolograms(toUpdate);
     }
 }

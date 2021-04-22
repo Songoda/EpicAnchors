@@ -30,7 +30,10 @@ import org.bukkit.plugin.PluginManager;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class EpicAnchors extends SongodaPlugin {
 
@@ -135,15 +138,28 @@ public class EpicAnchors extends SongodaPlugin {
     }
 
     public void updateHologram(Anchor anchor) {
+        updateHolograms(Collections.singletonList(anchor));
+    }
+
+    public void updateHolograms(List<Anchor> anchors) {
         // are holograms enabled?
         if (!Settings.HOLOGRAMS.getBoolean() || !HologramManager.getManager().isEnabled()) return;
-        // verify that this is a anchor
-        if (anchor.getLocation().getBlock().getType() != Settings.MATERIAL.getMaterial().getMaterial()) return;
-        // grab the name
-        String name = Methods.formatName(anchor.getTicksLeft()).trim();
-        Location location = correctHeight(anchor.getLocation());
-        // create the hologram
-        HologramManager.updateHologram(location, name);
+
+        Map<Location, List<String>> hologramData = new HashMap<>(anchors.size());
+
+        for (Anchor anchor : anchors) {
+            // verify that this is a anchor
+            if (anchor.getLocation().getBlock().getType() != Settings.MATERIAL.getMaterial().getMaterial()) continue;
+
+            // grab the name
+            String name = Methods.formatName(anchor.getTicksLeft()).trim();
+            Location location = correctHeight(anchor.getLocation());
+
+            hologramData.put(location, Collections.singletonList(name));
+        }
+
+        // create the holograms
+        HologramManager.bulkUpdateHolograms(hologramData);
     }
 
     private Location correctHeight(Location location) {
