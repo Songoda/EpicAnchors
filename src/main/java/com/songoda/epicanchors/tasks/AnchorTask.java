@@ -27,7 +27,7 @@ public class AnchorTask extends BukkitRunnable {
 
     private static EpicAnchors plugin;
 
-    private final Map<Location, Integer> delays = new HashMap<>();
+    private final Map<Location, Integer> spawnerDelays = new HashMap<>();
 
     private Class<?> clazzCraftEntity;
 
@@ -36,6 +36,7 @@ public class AnchorTask extends BukkitRunnable {
     private Field fieldCurrentTick, fieldActivatedTick;
 
     private final boolean epicSpawners;
+    private boolean epicSpawnersOutdated;
 
     public AnchorTask(EpicAnchors plug) {
         plugin = plug;
@@ -136,26 +137,34 @@ public class AnchorTask extends BukkitRunnable {
                 continue;
             }
 
-            if (!processChunk || !epicSpawners ||
-                    com.songoda.epicspawners.EpicSpawners.getInstance().getSpawnerManager() == null) continue;
+            try {
+                if (!processChunk || !epicSpawners || epicSpawnersOutdated ||
+                        com.songoda.epicspawners.EpicSpawners.getInstance().getSpawnerManager() == null) continue;
 
-            com.songoda.epicspawners.EpicSpawners.getInstance().getSpawnerManager().getSpawners().stream()
-                    .filter(spawner -> spawner.getWorld().isChunkLoaded(spawner.getX() >> 4, spawner.getZ() >> 4)
-                            && chunk == spawner.getLocation().getChunk()).forEach(spawner -> {
-                Block block = spawner.getLocation().getBlock();
+                com.songoda.epicspawners.EpicSpawners.getInstance().getSpawnerManager().getSpawners().stream()
+                        .filter(spawner ->
+                                spawner.getWorld().isChunkLoaded(spawner.getX() >> 4, spawner.getZ() >> 4) &&
+                                        chunk == spawner.getLocation().getChunk())
+                        .forEach(spawner -> {
+                            Block block = spawner.getLocation().getBlock();
 
-                if (!delays.containsKey(block.getLocation())) {
-                    delays.put(block.getLocation(), spawner.updateDelay());
-                    return;
-                }
-                int delay = delays.get(block.getLocation());
-                delay -= 1;
-                delays.put(block.getLocation(), delay);
-                if (delay <= 0) {
-                    spawner.spawn();
-                    delays.remove(block.getLocation());
-                }
-            });
+                            if (!spawnerDelays.containsKey(block.getLocation())) {
+                                spawnerDelays.put(block.getLocation(), spawner.updateDelay());
+                                return;
+                            }
+                            int delay = spawnerDelays.get(block.getLocation());
+                            delay -= 1;
+                            spawnerDelays.put(block.getLocation(), delay);
+                            if (delay <= 0) {
+                                spawner.spawn();
+                                spawnerDelays.remove(block.getLocation());
+                            }
+                        });
+            } catch (NoClassDefFoundError outdatedPlugin) {
+                epicSpawnersOutdated = true;
+
+                plugin.getLogger().warning("Could not hook into EpicSpawners - Please make sure you are using the latest versions");
+            }
         }
 
         plugin.updateHolograms(toUpdate);
