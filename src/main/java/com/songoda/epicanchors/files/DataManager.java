@@ -141,9 +141,9 @@ public class DataManager extends DataManagerAbstract {
 
             SQLException err = null;
 
-            for (AnchorMigration.LegacyAnchorEntry entry : anchorEntries) {
-                try (PreparedStatement ps = con.prepareStatement("INSERT INTO " + this.anchorTable +
-                        "(world_name,x,y,z, ticks_left) VALUES (?,?,?,?, ?);")) {
+            try (PreparedStatement ps = con.prepareStatement("INSERT INTO " + this.anchorTable +
+                    "(world_name,x,y,z, ticks_left) VALUES (?,?,?,?, ?);")) {
+                for (AnchorMigration.LegacyAnchorEntry entry : anchorEntries) {
                     ps.setString(1, entry.worldName);
                     ps.setInt(2, entry.x);
                     ps.setInt(3, entry.y);
@@ -151,10 +151,18 @@ public class DataManager extends DataManagerAbstract {
 
                     ps.setInt(5, entry.ticksLeft);
 
-                    ps.executeUpdate();
-                } catch (SQLException ex) {
-                    err = ex;
+                    ps.addBatch();
                 }
+
+                int[] batchRes = ps.executeBatch();
+
+                for (int i : batchRes) {
+                    if (i < 0 && i != PreparedStatement.SUCCESS_NO_INFO) {
+                        throw new AssertionError("Batch-INSERT failed for at least one statement with code " + i + "");
+                    }
+                }
+            } catch (SQLException ex) {
+                err = ex;
             }
 
             if (err == null) {

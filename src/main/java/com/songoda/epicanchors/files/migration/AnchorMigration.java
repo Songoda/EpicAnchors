@@ -8,7 +8,7 @@ import com.songoda.core.database.DatabaseConnector;
 import com.songoda.epicanchors.files.DataManager;
 import com.songoda.epicanchors.utils.ThreadSync;
 import org.bukkit.Location;
-import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.plugin.Plugin;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -27,9 +27,7 @@ public class AnchorMigration extends DataMigrationManager {
         this.dataManager = dataManager;
     }
 
-    // TODO: Migration of a lot of Anchors takes **very** long (1100 anchors => 9 seconds)
-    //       This is easily fixed by putting all inserts into one big transaction but prevents us from
-    public void migrateLegacyData(JavaPlugin plugin) {
+    public void migrateLegacyData(Plugin plugin) {
         long start = System.nanoTime();
 
         AtomicBoolean abortMigration = new AtomicBoolean(false);
