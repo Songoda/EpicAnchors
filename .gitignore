@@ -1,3 +1,5 @@
-.idea/*
-target/*
-EpicAnchors.iml
+/target/
+
+# JetBrains IDEs
+/.idea/
+*.iml

@@ -1,0 +1,97 @@
+name: 'Build & Test'
+
+on:
+  push:
+    branches: [ master, development, full-recode ]
+  pull_request:
+    types: [ opened, synchronize, reopened ]
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      # Setup Java
+      - uses: actions/setup-java@v2
+        with:
+          java-version: 16
+          distribution: adopt
+
+      # Checkout project files
+      - uses: actions/checkout@v2
+
+      # Caches
+      - name: 'Cache: Maven'
+        uses: actions/cache@v2
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-maven-
+
+      # Build project
+      - name: Build with Maven
+        run: 'mvn -B -Duser.name="GitHub Runner on $GITHUB_REPOSITORY (id=$GITHUB_RUN_ID)" clean package'
+
+      # Upload build artifacts
+      - name: 'Upload Build Artifact: EpicAnchors-*.jar'
+        uses: actions/upload-artifact@v2
+        with:
+          name: EpicAnchors-artifacts
+          path: ./target/EpicAnchors-*.jar
+
+      - name: 'debug log'
+        run: echo $GITHUB_REF
+      ##
+      # Discord Webhook
+      # TODO: Extract into external Action for better re-usability (and readability) [Copied SongodaCore]
+      ##
+      - name: 'Discord Webhook (Success)'
+        if: ${{ success() && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/development' || github.ref == 'refs/heads/full-recode') }}
+        continue-on-error: true
+        run: |
+          curl -X POST --data "{\"content\":null,\"embeds\":[{\"title\":\"Build succeeded!\",\"description\":\"The build with the ID #$GITHUB_RUN_NUMBER has succeeded!\",\"url\":\"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID\",\"color\":5490477,\"fields\":[{\"name\":\"Branch\",\"value\":\"$GITHUB_REF\",\"inline\":true}],\"author\":{\"name\":\"$GITHUB_REPOSITORY\",\"url\":\"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY\",\"icon_url\":\"$GITHUB_SERVER_URL/songoda.png\"},\"footer\":{\"text\":\"Initiated by $GITHUB_ACTOR\",\"icon_url\":\"$GITHUB_SERVER_URL/$GITHUB_ACTOR.png\"}}],\"username\":\"OctoAgent\",\"avatar_url\":\"https://github.githubassets.com/images/modules/logos_page/Octocat.png\"}" --header 'Content-Type: application/json' $DISCORD_WEBHOOK
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_BUILD_STATUS_WEBHOOK }}
+      - name: 'Discord Webhook (Failure)'
+        if: ${{ failure() && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/development' || github.ref == 'refs/heads/full-recode') }}
+        continue-on-error: true
+        run: |
+          curl -X POST --data "{\"content\":null,\"embeds\":[{\"title\":\"Build failed!\",\"description\":\"The build with the ID #$GITHUB_RUN_NUMBER has failed!\",\"url\":\"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID\",\"color\":15611419,\"fields\":[{\"name\":\"Branch\",\"value\":\"$GITHUB_REF\",\"inline\":true}],\"author\":{\"name\":\"$GITHUB_REPOSITORY\",\"url\":\"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY\",\"icon_url\":\"$GITHUB_SERVER_URL/songoda.png\"},\"footer\":{\"text\":\"Initiated by $GITHUB_ACTOR\",\"icon_url\":\"$GITHUB_SERVER_URL/$GITHUB_ACTOR.png\"}}],\"username\":\"OctoAgent\",\"avatar_url\":\"https://github.githubassets.com/images/modules/logos_page/Octocat.png\"}" --header "Content-Type:application/json" $DISCORD_WEBHOOK
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_BUILD_STATUS_WEBHOOK }}
+
+  sonarcloud:
+    name: SonarCloud
+    runs-on: ubuntu-latest
+    steps:
+      # Setup Java
+      - uses: actions/setup-java@v2
+        with:
+          java-version: 11
+          distribution: adopt
+
+      # Checkout project files
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+
+      # Caches
+      - name: 'Cache: Maven'
+        uses: actions/cache@v2
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-maven-
+      - name: 'Cache: SonarCloud'
+        uses: actions/cache@v2
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      # SonarCloud static analysis
+      - name: SonarCloud
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar

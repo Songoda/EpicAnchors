@@ -1,4 +1,4 @@
-package com.songoda.epicanchors.commands;
+package com.songoda.epicanchors.commands.sub;
 
 import com.songoda.core.commands.AbstractCommand;
 import com.songoda.core.configuration.editor.PluginConfigGui;
@@ -7,15 +7,16 @@ import com.songoda.epicanchors.EpicAnchors;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
+import java.util.Collections;
 import java.util.List;
 
-public class CommandSettings extends AbstractCommand {
+public class SettingsCommand extends AbstractCommand {
+    private final EpicAnchors instance;
+    private final GuiManager guiManager;
 
-    final EpicAnchors instance;
-    final GuiManager guiManager;
+    public SettingsCommand(EpicAnchors instance, GuiManager manager) {
+        super(CommandType.PLAYER_ONLY, false, "settings");
 
-    public CommandSettings(EpicAnchors instance, GuiManager manager) {
-        super(true, "settings");
         this.instance = instance;
         this.guiManager = manager;
     }
@@ -23,17 +24,18 @@ public class CommandSettings extends AbstractCommand {
     @Override
     protected ReturnType runCommand(CommandSender sender, String... args) {
         guiManager.showGUI((Player) sender, new PluginConfigGui(instance));
+
         return AbstractCommand.ReturnType.SUCCESS;
     }
 
     @Override
     protected List<String> onTab(CommandSender commandSender, String... strings) {
-        return null;
+        return Collections.emptyList();
     }
 
     @Override
     public String getPermissionNode() {
-        return "epicanchors.admin";
+        return "EpicAnchors.cmd.settings";
     }
 
     @Override

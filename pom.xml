@@ -1,119 +1,165 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0">
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
     <groupId>com.songoda</groupId>
     <artifactId>EpicAnchors</artifactId>
-    <modelVersion>4.0.0</modelVersion>
-    <version>1.4.10c</version>
+    <version>2.0.0-ALPHA</version>
+    <!-- Run 'mvn versions:set -DgenerateBackupPoms=false -DnewVersion=X.Y.Z-DEV' to update version recursively -->
+
+    <name>EpicAnchors</name>
+    <description>Allow your players to keep chunks loaded for a limited amount of time for a cost.</description>
+    <url>https://songoda.com/marketplace/product/31</url>
+
+    <properties>
+        <java.version>1.8</java.version>
+        <java.release>8</java.release>
+
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+        <sonar.projectKey>songoda_EpicAnchors</sonar.projectKey>
+        <sonar.organization>songoda</sonar.organization>
+        <sonar.host.url>https://sonarcloud.io</sonar.host.url>
+        <sonar.moduleKey>${project.groupId}:${project.artifactId}</sonar.moduleKey>
+    </properties>
+
+    <issueManagement>
+        <url>https://support.songoda.com/servicedesk/customer/portal/3</url>
+        <system>Jira Service Desk</system>
+    </issueManagement>
+
+    <scm>
+        <url>https://github.com/songoda/EpicAnchors</url>
+        <connection>scm:git:git:github.com/songoda/EpicAnchors.git</connection>
+    </scm>
+
     <build>
-        <defaultGoal>clean install</defaultGoal>
-        <finalName>EpicAnchors-${project.version}</finalName>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.8.0</version>
+                <version>3.8.1</version>
+
                 <configuration>
-                    <source>1.8</source>
-                    <target>1.8</target>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
+
+                    <release>${java.release}</release>
                 </configuration>
             </plugin>
-            <plugin>
-                <groupId>com.google.code.maven-replacer-plugin</groupId>
-                <artifactId>replacer</artifactId>
-                <version>1.5.3</version>
-                <executions>
-                    <execution>
-                        <phase>prepare-package</phase>
-                        <goals>
-                            <goal>replace</goal>
-                        </goals>
-                    </execution>
-                </executions>
-                <configuration>
-                    <file>${project.build.directory}/classes/plugin.yml</file>
-                    <replacements>
-                        <replacement>
-                            <token>maven-version-number</token>
-                            <value>${project.version}</value>
-                        </replacement>
-                    </replacements>
-                </configuration>
-            </plugin>
+
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
-                <version>3.1.0</version>
+                <version>3.3.0-SNAPSHOT</version>
+
                 <executions>
                     <execution>
-                        <id>shaded</id>
                         <phase>package</phase>
+
                         <goals>
                             <goal>shade</goal>
                         </goals>
+
                         <configuration>
-                            <shadedArtifactAttached>false</shadedArtifactAttached>
+                            <finalName>${project.name}-${project.version}</finalName>
+
                             <createDependencyReducedPom>false</createDependencyReducedPom>
                             <minimizeJar>true</minimizeJar>
-                            <artifactSet>
-                                <includes>
-                                    <include>com.songoda:SongodaCore</include>
-                                </includes>
-                            </artifactSet>
-                            <filters>
-                                <!-- This filter is primarily for anvil gui right now -->
-                                <!--<filter>
-                                    <artifact>com.songoda:SongodaCore-NMS*</artifact>
-                                    <includes>
-                                        <include>**</include>
-                                    </includes>
-                                </filter>-->
-                                <filter>
-                                    <artifact>*:*</artifact>
-                                    <excludes>
-                                        <exclude>META-INF/*.SF</exclude>
-                                        <exclude>META-INF/*.DSA</exclude>
-                                        <exclude>META-INF/*.RSA</exclude>
-                                    </excludes>
-                                </filter>
-                            </filters>
+
                             <relocations>
                                 <relocation>
                                     <pattern>com.songoda.core</pattern>
-                                    <shadedPattern>${project.groupId}.epicanchors.core</shadedPattern>
+                                    <shadedPattern>com.songoda.epicanchors.core</shadedPattern>
+                                </relocation>
+
+                                <relocation>
+                                    <pattern>epicanchors.nms</pattern>
+                                    <shadedPattern>com.songoda.epicanchors.nms</shadedPattern>
                                 </relocation>
                             </relocations>
+
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+
+                                    <excludes>
+                                        <exclude>META-INF/**</exclude>
+                                        <exclude>LICENSE</exclude>
+                                        <exclude>LICENSE.**</exclude>
+                                    </excludes>
+                                </filter>
+
+                                <filter>
+                                    <artifact>org.jetbrains:annotations</artifact>
+                                    <excludes>
+                                        <exclude>**</exclude>
+                                    </excludes>
+                                </filter>
+
+                                <filter>
+                                    <artifact>com.songoda:epicanchors-v*</artifact>
+                                    <includes>
+                                        <include>**</include>
+                                    </includes>
+                                </filter>
+                            </filters>
                         </configuration>
                     </execution>
                 </executions>
             </plugin>
         </plugins>
+
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+            </resource>
+        </resources>
     </build>
+
+    <pluginRepositories>
+        <pluginRepository>
+            <id>apache.snapshots</id>
+            <url>https://repository.apache.org/snapshots/</url>
+        </pluginRepository>
+    </pluginRepositories>
+
     <repositories>
         <repository>
-            <id>public</id>
-            <url>https://repo.songoda.com/repository/public/</url>
-        </repository>
-        <repository>
-            <id>spigot-repo</id>
+            <id>spigotmc-repo</id>
             <url>https://hub.spigotmc.org/nexus/content/repositories/snapshots/</url>
         </repository>
+
+        <repository>
+            <id>songoda-public</id>
+            <url>https://repo.songoda.com/repository/public/</url>
+        </repository>
     </repositories>
+
     <dependencies>
         <dependency>
             <groupId>org.spigotmc</groupId>
-            <artifactId>spigot</artifactId>
-            <version>1.16.4</version>
+            <artifactId>spigot-api</artifactId>
+            <version>1.8-R0.1-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
+
         <dependency>
             <groupId>com.songoda</groupId>
             <artifactId>SongodaCore</artifactId>
-            <version>LATEST</version>
+            <version>2.5.8</version>
             <scope>compile</scope>
         </dependency>
+
+        <!-- Dev dependencies -->
         <dependency>
-            <groupId>com.songoda</groupId>
-            <artifactId>epicspawners</artifactId>
-            <version>6-pre4</version>
+            <groupId>org.jetbrains</groupId>
+            <artifactId>annotations</artifactId>
+            <version>21.0.1</version>
+            <scope>compile</scope>
         </dependency>
     </dependencies>
 </project>

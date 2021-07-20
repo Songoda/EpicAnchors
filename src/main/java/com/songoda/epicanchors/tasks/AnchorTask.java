@@ -1,145 +1,122 @@
 package com.songoda.epicanchors.tasks;
 
-import com.songoda.core.compatibility.CompatibleMaterial;
-import com.songoda.core.compatibility.CompatibleParticleHandler;
-import com.songoda.core.compatibility.ServerVersion;
+import com.songoda.core.nms.NmsManager;
+import com.songoda.epicanchors.Anchor;
+import com.songoda.epicanchors.AnchorManager;
 import com.songoda.epicanchors.EpicAnchors;
-import com.songoda.epicanchors.anchor.Anchor;
-import com.songoda.epicanchors.settings.Settings;
-import org.bukkit.*;
-import org.bukkit.block.Block;
-import org.bukkit.entity.Entity;
-import org.bukkit.entity.LivingEntity;
+import com.songoda.epicanchors.utils.Utils;
+import com.songoda.epicanchors.utils.WorldUtils;
+import org.bukkit.Bukkit;
+import org.bukkit.Chunk;
+import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.logging.Level;
 
+/**
+ * More information about what types of game ticks there are and what does what: https://minecraft.fandom.com/wiki/Tick
+ */
 public class AnchorTask extends BukkitRunnable {
+    private static final int TASK_INTERVAL = 3;
 
-    private static EpicAnchors plugin;
+    private final EpicAnchors plugin;
+    private final AnchorManager anchorManager;
 
-    private Map<Location, Integer> delays = new HashMap<>();
+    private boolean randomTicksFailed;
+    private boolean spawnerTicksFailed;
 
-    private Class<?> clazzEntity, clazzCraftEntity, clazzMinecraftServer;
-
-    private Method methodTick, methodGetHandle;
-
-    private Field fieldCurrentTick, fieldActivatedTick;
-
-    private boolean epicSpawners;
-
-    public AnchorTask(EpicAnchors plug) {
-        plugin = plug;
-        epicSpawners = Bukkit.getPluginManager().getPlugin("EpicSpawners") != null;
-
-        try {
-            String ver = Bukkit.getServer().getClass().getPackage().getName().substring(23);
-            clazzMinecraftServer = Class.forName("net.minecraft.server." + ver + ".MinecraftServer");
-            clazzEntity = Class.forName("net.minecraft.server." + ver + ".Entity");
-            clazzCraftEntity = Class.forName("org.bukkit.craftbukkit." + ver + ".entity.CraftEntity");
-
-            if (ServerVersion.isServerVersionAtLeast(ServerVersion.V1_13))
-                methodTick = clazzEntity.getDeclaredMethod("tick");
-            else if (ServerVersion.isServerVersion(ServerVersion.V1_12))
-                methodTick = clazzEntity.getDeclaredMethod("B_");
-            else if (ServerVersion.isServerVersion(ServerVersion.V1_11))
-                methodTick = clazzEntity.getDeclaredMethod("A_");
-            else if (ServerVersion.isServerVersionAtLeast(ServerVersion.V1_9))
-                methodTick = clazzEntity.getDeclaredMethod("m");
-            else
-                methodTick = clazzEntity.getDeclaredMethod("t_");
-
-            methodGetHandle = clazzCraftEntity.getDeclaredMethod("getHandle");
-
-            fieldCurrentTick = clazzMinecraftServer.getDeclaredField("currentTick");
-            fieldActivatedTick = clazzEntity.getDeclaredField("activatedTick");
-
-        } catch (ReflectiveOperationException e) {
-            e.printStackTrace();
-        }
-
-        this.runTaskTimer(plugin, 0, 3);
+    public AnchorTask(EpicAnchors plugin) {
+        this.plugin = plugin;
+        this.anchorManager = plugin.getAnchorManager();
     }
 
-    private void doParticle() {
-        for (Anchor anchor : plugin.getAnchorManager().getAnchors().values()) {
-            Location location1 = anchor.getLocation().add(.5, .5, .5);
-            if (location1.getWorld() == null) continue;
-            CompatibleParticleHandler.redstoneParticles(location1, 255, 255, 255, 1.2F, 5, .75F);
-        }
+    public void startTask() {
+        runTaskTimer(this.plugin, TASK_INTERVAL, TASK_INTERVAL);
     }
 
     @Override
     public void run() {
-        doParticle();
-        for (Anchor anchor : new ArrayList<>(plugin.getAnchorManager().getAnchors().values())) {
+        try {
+            for (World world : Bukkit.getWorlds()) {
+                if (!this.anchorManager.isReady(world)) return;
 
-            if (anchor.getLocation() == null) continue;
+                int randomTicks = WorldUtils.getRandomTickSpeed(world) * TASK_INTERVAL;
 
-            plugin.updateHologram(anchor);
+                Set<Chunk> alreadyTicked = new HashSet<>();
+                Anchor[] anchorsInWorld = this.anchorManager.getAnchors(world);
+                List<Anchor> toUpdateHolo = new ArrayList<>(anchorsInWorld.length);
 
-            Location location = anchor.getLocation();
-            if (CompatibleMaterial.getMaterial(location.getBlock()) != Settings.MATERIAL.getMaterial())
-                continue;
-
-            Chunk chunk = location.getChunk();
-            chunk.load();
-
-            // Load entities
-            for (Entity entity : chunk.getEntities()) {
-                if (!(entity instanceof LivingEntity) || entity instanceof Player) continue;
-
-                if (entity.getNearbyEntities(32, 32, 32).stream().anyMatch(entity1 -> entity1 instanceof Player)) {
-                    continue;
+                // Skip all chunks with players in them
+                for (Player pInWorld : world.getPlayers()) {
+                    alreadyTicked.add(pInWorld.getLocation().getChunk());
                 }
 
-                try {
-                    Object objCraftEntity = clazzCraftEntity.cast(entity);
-                    Object objEntity = methodGetHandle.invoke(objCraftEntity);
+                for (Anchor anchor : anchorsInWorld) {
+                    Chunk chunk = anchor.getChunk();
 
-                    fieldActivatedTick.set(objEntity, fieldCurrentTick.getLong(objEntity));
-                    methodTick.invoke(objEntity);
-                } catch (ReflectiveOperationException e) {
-                    e.printStackTrace();
+                    // Tick the anchor's chunk (but not multiple times)
+                    if (alreadyTicked.add(chunk)) {
+                        // Having a chunk loaded takes care of entities and weather (https://minecraft.fandom.com/wiki/Tick#Chunk_tick)
+                        if (!chunk.isLoaded()) {
+                            // Loading an already loaded chunk still fires the ChunkLoadEvent and might have a huge
+                            // impact on performance if other plugins do not expect that either...
+
+                            WorldUtils.loadAnchoredChunk(chunk, this.plugin);
+                        }
+
+                        if (!randomTicksFailed) {
+                            try {
+                                NmsManager.getWorld().randomTickChunk(chunk, randomTicks);
+                            } catch (NoSuchFieldException | IllegalAccessException ex) {
+                                this.plugin.getLogger().log(Level.FINER, ex,
+                                        () -> "Failed to do random ticks on this server implementation(/version) - " +
+                                                "Skipping further random ticks.");
+
+                                randomTicksFailed = true;
+                            }
+                        }
+
+                        if (!spawnerTicksFailed) {
+                            try {
+                                NmsManager.getWorld().tickInactiveSpawners(chunk, TASK_INTERVAL);
+                            } catch (NoSuchFieldException | IllegalAccessException ex) {
+                                this.plugin.getLogger().log(Level.FINER, ex,
+                                        () -> "Failed to do spawner ticks on this server implementation(/version) - " +
+                                                "Skipping further spawner ticks.");
+
+                                spawnerTicksFailed = true;
+                            }
+                        }
+                    }
+
+                    // TODO: Only update hologram if a player is nearby
+                    //       Simplify player location to chunks to potentially group players
+                    //       Use the server view distance to calculate minimum distance to count as not-nearby
+
+                    // Destroy anchors and queue hologram update
+                    if (!anchor.isInfinite()) {
+                        int ticksLeft = anchor.removeTicksLeft(3);
+
+                        if (ticksLeft == 0) {
+                            this.anchorManager.destroyAnchor(anchor);
+                        } else {
+                            toUpdateHolo.add(anchor);
+                        }
+                    } else {
+                        toUpdateHolo.add(anchor);
+                    }
                 }
+
+                // Update holograms on queued anchors
+                anchorManager.updateHolograms(toUpdateHolo);
             }
-
-            int ticksLeft = anchor.getTicksLeft();
-
-            if (!anchor.isInfinite()) {
-                anchor.setTicksLeft(ticksLeft - 3);
-            }
-
-            if (ticksLeft <= 0 && !anchor.isInfinite()) {
-                anchor.bust();
-                chunk.unload();
-                return;
-            }
-
-            if (!epicSpawners || com.songoda.epicspawners.EpicSpawners.getInstance().getSpawnerManager() == null) continue;
-
-            com.songoda.epicspawners.EpicSpawners.getInstance().getSpawnerManager().getSpawners().stream()
-                    .filter(spawner -> spawner.getWorld().isChunkLoaded(spawner.getX() >> 4, spawner.getZ() >> 4)
-                            && chunk == spawner.getLocation().getChunk()).forEach(spawner -> {
-                Block block = spawner.getLocation().getBlock();
-
-                if (!delays.containsKey(block.getLocation())) {
-                    delays.put(block.getLocation(), spawner.updateDelay());
-                    return;
-                }
-                int delay = delays.get(block.getLocation());
-                delay -= 1;
-                delays.put(block.getLocation(), delay);
-                if (delay <= 0) {
-                    spawner.spawn();
-                    delays.remove(block.getLocation());
-                }
-            });
+        } catch (Exception ex) {
+            Utils.logException(this.plugin, ex);
         }
     }
 }

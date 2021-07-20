@@ -14,9 +14,16 @@ interface:
     addtimewithxplore: '&7Cost: &a%cost% Levels'
     addtimewitheconomy: '&aAdd 30 Minutes with ECO'
     addtimewitheconomylore: '&7Cost: &a$%cost%'
+
+    cancelDestroy: '&4Cancel'
+    cancelDestroyLore: ''
+    confirmDestroy: '&2Confirm'
+    confirmDestroyLore: '&aA new anchor with the remaining time will be dropped.'
+    confirmDestroyLoreNoDrops: '&4The remaining time on this anchor will be lost!'
+
     infinite: '&cCannot upgrade an infinite anchor!'
   anchor:
-    title: ChunkAnchor
+    title: 'ChunkAnchor'
     smalltitle: '&eChunkAnchor'
 
 # Command Messages

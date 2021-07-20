@@ -1,13 +1,29 @@
-name: EpicAnchors
-description: EpicAnchors
-version: maven-version-number
-softdepend: [EpicSpawners, Towny, RedProtect, Kingdoms, PlotsSquared, GriefPrevention, USkyBlock, ASkyBlock, WorldGuard, Factions, Vault, HolographicDisplays, Holograms, CMI]
-main: com.songoda.epicanchors.EpicAnchors
-author: songoda
+name: ${project.name}
+description: ${project.description}
+version: ${project.version}
 api-version: 1.13
+
+main: com.songoda.epicanchors.EpicAnchors
+softdepend:
+  - Holograms
+  - HolographicDisplays
+  - Vault
+
+author: Songoda
+authors: [ SpraxDev ]
+website: ${project.url}
+
 commands:
   EpicAnchors:
-    description: I have no idea.
+    aliases:
+      - ea
+
+permissions:
+  EpicAnchors.cmd.show:
     default: true
-    aliases: [ea]
-    usage: /<command> [reload]
+
+  EpicAnchors.admin:
+    children:
+      EpicAnchors.cmd.reload: true
+      EpicAnchors.cmd.settings: true
+      EpicAnchors.cmd.give: true
