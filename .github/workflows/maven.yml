@@ -39,6 +39,8 @@ jobs:
           name: EpicAnchors-artifacts
           path: ./target/EpicAnchors-*.jar
 
+      - name: 'debug log'
+        run: echo $GITHUB_REF
       ##
       # Discord Webhook
       # TODO: Extract into external Action for better re-usability (and readability) [Copied SongodaCore]
